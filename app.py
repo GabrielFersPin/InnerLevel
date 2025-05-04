@@ -14,11 +14,280 @@ import os
 import json
 from uuid import uuid4
 
+# Page layout
+st.set_page_config(page_title="InnerLevel | Gamification Tracker", layout="wide")
+
+# Custom CSS function
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# Inline CSS for cases where you want to define styles directly
+def set_page_style():
+    st.markdown("""
+    <style>
+    /* Add any additional inline styles here */
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    /* Make the app header more prominent */
+    .main h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(90deg, #3498db, #2ecc71);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        padding: 10px 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Apply custom styling
+try:
+    local_css("style.css")
+except FileNotFoundError:
+    st.warning("style.css file not found. Using default styling.")
+
+# Apply inline styles
+set_page_style()
+
+# Custom UI Component Functions
+def render_metric_card(title, value, delta=None, icon=None):
+    """Renders a beautiful metric card with optional trend indicator"""
+    # Create a container for the card
+    with st.container():
+        # Create the card content
+        st.markdown(f'<div style="background-color: white; border-radius: 10px; padding: 1rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-bottom: 1rem;">', unsafe_allow_html=True)
+        
+        # Add icon and title
+        if icon:
+            st.markdown(f'<div style="color: #7f8c8d; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">{icon} {title}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div style="color: #7f8c8d; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">{title}</div>', unsafe_allow_html=True)
+        
+        # Add the metric value
+        st.metric(label="", value=value, delta=delta)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def render_task_card(task, due_date, priority, status, points, task_id):
+    """Renders a beautiful task card with priority color coding"""
+    priority_color = {
+        "High": "#e74c3c",
+        "Medium": "#f39c12",
+        "Low": "#2ecc71"
+    }.get(priority, "#7f8c8d")
+    
+    html = f"""
+    <div id="task-{task_id}" style="background-color: white; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); border-left: 4px solid {priority_color};">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-weight: bold; font-size: 1.1rem; color: #2c3e50;">{task}</div>
+                <div style="color: #7f8c8d; font-size: 0.875rem; margin-top: 0.25rem;">
+                    Due: {due_date} | Status: {status} | Points: {points}
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+    
+    if not completed:
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            complete = st.button("Complete", key=f"complete_{task_id}")
+        with col2:
+            remove = st.button("Remove", key=f"remove_{task_id}")
+        return complete, remove
+    else:
+        remove = st.button("Remove", key=f"remove_{task_id}")
+        return False, remove
+
+def render_reward_card(name, description, category, points_required, progress, reward_id):
+    """Renders a beautiful reward card with progress bar"""
+    progress_percentage = min(100, (progress / points_required) * 100)
+    progress_color = "#2ecc71" if progress >= points_required else "#3498db"
+    
+    html = f"""
+    <div style="background-color: white; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+        <div style="margin-bottom: 0.5rem;">
+            <div style="font-weight: bold; font-size: 1.1rem; color: #2c3e50;">{name}</div>
+            <div style="color: #7f8c8d; font-size: 0.875rem; margin-top: 0.25rem;">{description}</div>
+        </div>
+        <div style="margin-top: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                <span style="color: #7f8c8d; font-size: 0.875rem;">Progress</span>
+                <span style="color: #7f8c8d; font-size: 0.875rem;">{progress}/{points_required} points</span>
+            </div>
+            <div style="background-color: #ecf0f1; border-radius: 5px; height: 8px; overflow: hidden;">
+                <div style="background-color: {progress_color}; width: {progress_percentage}%; height: 100%; transition: width 0.3s ease;"></div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+def render_habit_button(habit_name, category, points, date):
+    """Renders a clickable habit button for quick logging"""
+    category_colors = {
+        "Professional": "#3498db",
+        "Personal": "#9b59b6"
+    }
+    
+    color = category_colors.get(category, "#95a5a6")
+    
+    html = f"""
+    <div style="display: inline-block; margin-right: 10px; margin-bottom: 10px;">
+        <button style="background-color: {color}; color: white; border: none; border-radius: 20px; padding: 10px 20px; 
+                      font-weight: 600; display: flex; align-items: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            {habit_name} <span style="margin-left: 8px; background-color: rgba(255,255,255,0.3); 
+                                     padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">
+                         {points} pts
+                         </span>
+        </button>
+    </div>
+    """
+    return html
+
+# Function to add JavaScript animations
+def add_animations():
+    """Add JavaScript animations to the app"""
+    js = """
+    <script>
+    // Animation for task completion
+    function animateCompletion(elementId) {
+        const element = document.getElementById(elementId);
+        element.style.transition = "all 0.5s ease";
+        element.style.transform = "scale(1.05)";
+        element.style.boxShadow = "0 10px 20px rgba(0,0,0,0.2)";
+        
+        setTimeout(() => {
+            element.style.transform = "scale(1)";
+            element.style.opacity = "0.6";
+            element.style.textDecoration = "line-through";
+        }, 500);
+    }
+    
+    // Confetti animation for achievements
+    function showConfetti() {
+        // Create canvas element
+        const canvas = document.createElement('canvas');
+        canvas.id = 'confetti-canvas';
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.zIndex = '9999';
+        document.body.appendChild(canvas);
+        
+        // Initialize confetti
+        const confetti = {
+            maxCount: 100,
+            speed: 2,
+            frameInterval: 15,
+            alpha: 1.0,
+            particles: [],
+            active: true,
+            colors: [
+                [85, 71, 106],
+                [174, 61, 99],
+                [219, 56, 83],
+                [244, 92, 68],
+                [248, 182, 70]
+            ],
+            context: canvas.getContext('2d'),
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+        
+        // Initialize particles
+        for (let i = 0; i < confetti.maxCount; i++) {
+            confetti.particles.push({
+                x: Math.random() * confetti.width,
+                y: Math.random() * confetti.height - confetti.height,
+                r: Math.random() * 4 + 1,
+                d: Math.random() * 3 + 2,
+                color: confetti.colors[Math.floor(Math.random() * confetti.colors.length)],
+                tilt: Math.random() * 10 - 10,
+                tiltAngle: Math.random() * 0.1 - 0.05,
+                tiltAngleIncrement: Math.random() * 0.1 - 0.05
+            });
+        }
+        
+        // Animation loop
+        function animate() {
+            if (!confetti.active) {
+                canvas.remove();
+                return;
+            }
+            
+            confetti.context.clearRect(0, 0, confetti.width, confetti.height);
+            
+            confetti.particles.forEach((particle, index) => {
+                particle.y += particle.d;
+                particle.tiltAngle += particle.tiltAngleIncrement;
+                particle.tilt = Math.sin(particle.tiltAngle) * 15;
+                
+                if (particle.y > confetti.height) {
+                    particle.y = -particle.r;
+                    particle.x = Math.random() * confetti.width;
+                }
+                
+                confetti.context.beginPath();
+                confetti.context.lineWidth = particle.r;
+                confetti.context.strokeStyle = `rgba(${particle.color[0]}, ${particle.color[1]}, ${particle.color[2]}, ${confetti.alpha})`;
+                confetti.context.moveTo(particle.x + particle.tilt + particle.r, particle.y);
+                confetti.context.lineTo(particle.x + particle.tilt, particle.y + particle.tilt);
+                confetti.context.stroke();
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Start animation
+        animate();
+        
+        // Stop after 3 seconds
+        setTimeout(() => {
+            confetti.active = false;
+        }, 3000);
+    }
+    
+    // Add hover effects to cards
+    document.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            card.style.transform = 'translateY(-5px)';
+            card.style.boxShadow = '0 10px 20px rgba(0,0,0,0.1)';
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'translateY(0)';
+            card.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+        });
+    });
+    
+    // Add click animations to buttons
+    document.querySelectorAll('button').forEach(button => {
+        button.addEventListener('click', () => {
+            button.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                button.style.transform = 'scale(1)';
+            }, 100);
+        });
+    });
+    </script>
+    """
+    st.markdown(js, unsafe_allow_html=True)
+
 # Files for data storage
 TASKS_FILE = "task_log.csv"
 HABITS_FILE = "habits.json"
 TODO_FILE = "todo.csv"
-REWARDS_FILE = "rewards.json"  # Add this line
+REWARDS_FILE = "rewards.json"
 
 # Initialize files if they don't exist
 if not os.path.exists(TASKS_FILE):
@@ -61,9 +330,6 @@ todo_df = pd.read_csv(TODO_FILE)
 
 with open(HABITS_FILE, "r") as f:
     habits_data = json.load(f)
-
-# Page layout
-st.set_page_config(page_title="InnerLevel | Gamification Tracker", layout="wide")
 
 # Sidebar navigation
 st.sidebar.title("🎮 InnerLevel")
@@ -116,21 +382,27 @@ def calculate_available_points():
 # Add welcome message and explanation on Dashboard
 if page == "🏠 Dashboard":
     st.title("🎯 Welcome to InnerLevel")
-    st.markdown("""
-    Transform your learning journey into an exciting adventure! Track your progress, build habits, and earn rewards.
     
-    **Quick Guide:**
-    - 📝 Log your daily activities to earn points
-    - ⚡ Create habits to stay consistent
-    - 📋 Manage your tasks with the to-do list
-    - 🎁 Redeem points for rewards
-    """)
+    # Add a hero section with a motivational quote
+    st.markdown("""
+    <div style="background: linear-gradient(to right, #3a7bd5, #00d2ff); 
+                padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+        <h2 style="color: white; margin-bottom: 10px;">Transform Your Learning Journey Into An Adventure</h2>
+        <p style="color: white; font-style: italic;">
+            "The secret of getting ahead is getting started. The secret of getting started is breaking your complex, 
+            overwhelming tasks into small manageable tasks, and then starting on the first one."
+            <br>— Mark Twain
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Load the latest data
     tasks_df, todo_df, habits_data, rewards_data = load_data()
     
     # Calculate metrics
     total_points = tasks_df["Points"].sum() if not tasks_df.empty else 0
+    available_points = calculate_available_points()
+    
     if not tasks_df.empty:
         tasks_this_week = tasks_df[tasks_df["Date"] >= (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")]
         points_this_week = tasks_this_week["Points"].sum()
@@ -139,45 +411,179 @@ if page == "🏠 Dashboard":
         category_split = tasks_df.groupby("Category")["Points"].sum()
         professional_points = category_split.get("Professional", 0)
         personal_points = category_split.get("Personal", 0)
+        
+        # Calculate streak
+        tasks_df_sorted = tasks_df.sort_values(by="Date")
+        dates = pd.to_datetime(tasks_df_sorted["Date"]).dt.date.unique()
+        today = datetime.date.today()
+        
+        # Check if there's an entry for today
+        current_streak = 0
+        if today in dates:
+            current_streak = 1
+            prev_date = today - datetime.timedelta(days=1)
+            while prev_date in dates:
+                current_streak += 1
+                prev_date = prev_date - datetime.timedelta(days=1)
     else:
         points_this_week = 0
         professional_points = 0
         personal_points = 0
+        current_streak = 0
     
-    # Display metrics
+    # Display metrics in beautiful cards
     col1, col2, col3 = st.columns(3)
+    
     with col1:
-        st.metric("Total Points", total_points)
+        render_metric_card("Total Points", total_points, None, "🏆")
     with col2:
-        st.metric("Points This Week", points_this_week)
+        previous_week = 0
+        if not tasks_df.empty:
+            two_weeks_ago = tasks_df[(tasks_df["Date"] >= (datetime.datetime.now() - datetime.timedelta(days=14)).strftime("%Y-%m-%d")) & 
+                                  (tasks_df["Date"] < (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d"))]
+            previous_week = two_weeks_ago["Points"].sum()
+        
+        delta = 0
+        if previous_week > 0:
+            delta = ((points_this_week - previous_week) / previous_week) * 100
+            delta = round(delta, 1)
+        
+        render_metric_card("Points This Week", points_this_week, delta, "📅")
     with col3:
-        st.metric("Tasks Completed", len(tasks_df))
+        render_metric_card("Current Streak", f"{current_streak} days", None, "🔥")
     
-    # Display category breakdown
-    st.subheader("Points by Category")
-    category_col1, category_col2 = st.columns(2)
-    with category_col1:
-        st.metric("Professional", professional_points)
-    with category_col2:
-        st.metric("Personal", personal_points)
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    # Recent activities
-    st.subheader("Recent Activities")
-    if not tasks_df.empty:
-        recent_activities = tasks_df[["Date", "Category", "Task", "Points", "Comment"]]
-        st.dataframe(recent_activities.sort_values(by="Date", ascending=False).head(5), use_container_width=True)
-    else:
-        st.info("No activities logged yet. Start by adding some in the 'Log Activity' section!")
-    # Pending to-do items
-    st.subheader("Pending To-Do Items")
-    if not todo_df.empty:
-        pending_tasks = todo_df[todo_df["Status"] != "Completed"].sort_values(by="Priority", ascending=True)
-        if not pending_tasks.empty:
-            st.dataframe(pending_tasks[["Task", "Due Date", "Priority", "Points"]], use_container_width=True)
+    # Display progress bars for categories
+    st.markdown("### Points by Category")
+    
+    total_category_points = professional_points + personal_points
+    prof_percentage = 0
+    pers_percentage = 0
+    
+    if total_category_points > 0:
+        prof_percentage = int((professional_points / total_category_points) * 100)
+        pers_percentage = int((personal_points / total_category_points) * 100)
+    
+    st.markdown(f"""
+    <div style="margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <span>Professional</span>
+            <span>{professional_points} points ({prof_percentage}%)</span>
+        </div>
+        <div style="width: 100%; background-color: #ecf0f1; border-radius: 10px; height: 10px;">
+            <div style="width: {prof_percentage}%; background-color: #3498db; height: 10px; border-radius: 10px;"></div>
+        </div>
+    </div>
+    
+    <div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <span>Personal</span>
+            <span>{personal_points} points ({pers_percentage}%)</span>
+        </div>
+        <div style="width: 100%; background-color: #ecf0f1; border-radius: 10px; height: 10px;">
+            <div style="width: {pers_percentage}%; background-color: #9b59b6; height: 10px; border-radius: 10px;"></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Create two columns for Recent Activities and Pending Tasks
+    left_col, right_col = st.columns([1, 1])
+    
+    with left_col:
+        st.markdown("""
+        <div style="background-color: white; border-radius: 10px; padding: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <h3 style="color: #3498db; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px;">
+                📝 Recent Activities
+            </h3>
+        """, unsafe_allow_html=True)
+        
+        if not tasks_df.empty:
+            st.markdown('<div style="height: 300px; overflow-y: auto;">', unsafe_allow_html=True)
+            recent_activities = tasks_df.sort_values(by="Date", ascending=False).head(5)
+            for _, activity in recent_activities.iterrows():
+                category_class = "professional" if activity["Category"] == "Professional" else "personal"
+                st.markdown(f"""
+                <div style="margin-bottom: 10px; border-left: 3px solid {'#3498db' if category_class == 'professional' else '#9b59b6'}; padding-left: 10px;">
+                    <div style="font-weight: bold;">{activity["Task"]}</div>
+                    <div style="display: flex; justify-content: space-between; color: #7f8c8d; font-size: 0.8rem;">
+                        <span>{activity["Date"]}</span>
+                        <span style="background-color: {'#3498db' if category_class == 'professional' else '#9b59b6'}; 
+                                     color: white; padding: 2px 8px; border-radius: 10px;">
+                            +{activity["Points"]} pts
+                        </span>
+                    </div>
+                    {f'<div style="font-style: italic; margin-top: 5px;">{activity["Comment"]}</div>' if activity["Comment"] else ''}
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.success("No pending tasks! You're all caught up.")
-    else:
-        st.info("No to-do items yet. Add some in the 'To-Do List' section!")
+            st.info("No activities logged yet. Start by adding some in the 'Log Activity' section!")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    with right_col:
+        st.markdown("""
+        <div style="background-color: white; border-radius: 10px; padding: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <h3 style="color: #3498db; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px;">
+                📋 Pending Tasks
+            </h3>
+        """, unsafe_allow_html=True)
+        
+        if not todo_df.empty:
+            st.markdown('<div style="height: 300px; overflow-y: auto;">', unsafe_allow_html=True)
+            pending_tasks = todo_df[todo_df["Status"] != "Completed"].sort_values(by="Priority", ascending=True).head(5)
+            if not pending_tasks.empty:
+                for _, task in pending_tasks.iterrows():
+                    priority_color = "#e74c3c" if task["Priority"] == "High" else "#f39c12" if task["Priority"] == "Medium" else "#2ecc71"
+                    st.markdown(f"""
+                    <div style="margin-bottom: 10px; border-left: 3px solid {priority_color}; padding-left: 10px;">
+                        <div style="font-weight: bold;">{task["Task"]}</div>
+                        <div style="display: flex; justify-content: space-between; color: #7f8c8d; font-size: 0.8rem;">
+                            <span>Due: {task["Due Date"]}</span>
+                            <span style="background-color: {priority_color}; color: white; padding: 2px 8px; border-radius: 10px;">
+                                {task["Priority"]}
+                            </span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.success("No pending tasks! You're all caught up.")
+        else:
+            st.info("No to-do items yet. Add some in the 'To-Do List' section!")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Quick Actions Section
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background-color: white; border-radius: 10px; padding: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+        <h3 style="color: #3498db; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px;">
+            ⚡ Quick Actions
+        </h3>
+    """, unsafe_allow_html=True)
+    
+    quick_action_col1, quick_action_col2, quick_action_col3 = st.columns([1, 1, 1])
+    
+    with quick_action_col1:
+        if st.button("➕ Log Activity", use_container_width=True):
+            # Use session state to switch pages
+            st.session_state.page = "📝 Log Activity"
+            st.rerun()
+    
+    with quick_action_col2:
+        if st.button("📋 Add Task", use_container_width=True):
+            st.session_state.page = "📋 To-Do List"
+            st.rerun()
+    
+    with quick_action_col3:
+        if st.button("🎁 View Rewards", use_container_width=True):
+            st.session_state.page = "🎁 Rewards"
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Add explanatory text for Log Activity
 elif page == "📝 Log Activity":
@@ -469,8 +875,14 @@ elif page == "📋 To-Do List":
                 col1, col2, col3 = st.columns([6, 2, 2])
                 
                 with col1:
-                    st.write(f"**{task}** {priority_color.get(priority, '')}")
-                    st.caption(f"Due: {due_date} | Status: {status} | Points: {points}")
+                    st.markdown(f"""
+                    <div id="task-{task_id}" style="margin-bottom: 10px; border-left: 3px solid {priority_color}; padding-left: 10px;">
+                        <div style="font-weight: bold;">{task}</div>
+                        <div style="display: flex; justify-content: space-between; color: #7f8c8d; font-size: 0.8rem;">
+                            <span>Due: {due_date} | Status: {status} | Points: {points}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 with col2:
                     if status != "Completed":
@@ -490,6 +902,14 @@ elif page == "📋 To-Do List":
                             
                             tasks_df = pd.concat([tasks_df, new_activity], ignore_index=True)
                             tasks_df.to_csv(TASKS_FILE, index=False)
+                            
+                            # Add completion animation
+                            st.markdown(f"""
+                            <script>
+                            animateCompletion('task-{task_id}');
+                            showConfetti();
+                            </script>
+                            """, unsafe_allow_html=True)
                             
                             st.success(f"✅ Task completed: {task} (+{points} points)")
                             st.rerun()
@@ -564,6 +984,13 @@ elif page == "🎁 Rewards":
                                 # Save updated rewards data
                                 with open(REWARDS_FILE, "w") as f:
                                     json.dump(rewards_data, f, indent=4)
+                                
+                                # Show celebration animation
+                                st.markdown("""
+                                <script>
+                                showConfetti();
+                                </script>
+                                """, unsafe_allow_html=True)
                                 
                                 st.success(f"✅ Reward redeemed: {reward['name']}")
                                 st.rerun()
@@ -737,3 +1164,9 @@ st.sidebar.markdown("---")
 st.sidebar.caption("🎮 InnerLevel - Gamify Your Growth")
 st.sidebar.caption("🌱 Making personal development fun and rewarding")
 st.sidebar.caption("© 2025 Gabriel Felipe Fernandes Pinheiro")
+
+if 'page' not in st.session_state:
+    st.session_state.page = "🏠 Dashboard"
+
+# Add animations at app startup
+add_animations()
