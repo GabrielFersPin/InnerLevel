@@ -291,7 +291,7 @@ REWARDS_FILE = "rewards.json"
 
 # Initialize files if they don't exist
 if not os.path.exists(TASKS_FILE):
-    df_init = pd.DataFrame(columns=["Date", "Category", "Task", "Points", "Comment"])
+    df_init = pd.DataFrame(columns=["Date", "Category", "Task", "Points", "Comment", "Emotional_State_Before", "Emotional_State_After", "Energy_Level"])
     df_init.to_csv(TASKS_FILE, index=False)
 
 if not os.path.exists(TODO_FILE):
@@ -305,7 +305,12 @@ if not os.path.exists(HABITS_FILE):
             {"name": "LinkedIn Post", "category": "Professional", "points": 10},
             {"name": "Job Application", "category": "Professional", "points": 15},
             {"name": "Exercise", "category": "Personal", "points": 5},
-            {"name": "Reading", "category": "Personal", "points": 3}
+            {"name": "Reading", "category": "Personal", "points": 3},
+            {"name": "Dormí bien 7 horas", "category": "Self-Care", "points": 10},
+            {"name": "Pausa sin pantalla (20 min)", "category": "Self-Care", "points": 5},
+            {"name": "Escribí cómo me sentía hoy", "category": "Self-Care", "points": 15},
+            {"name": "Descanso sin culpa", "category": "Self-Care", "points": 20},
+            {"name": "Meditación", "category": "Self-Care", "points": 10}
         ]
     }
     with open(HABITS_FILE, "w") as f:
@@ -339,6 +344,7 @@ page = st.sidebar.radio("Navigation", [
     "⚡ Manage Habits",
     "📋 To-Do List", 
     "🎁 Rewards",
+    "😌 Emotional Well-being",
     "📊 Analytics"
 ])
 
@@ -387,11 +393,12 @@ if page == "🏠 Dashboard":
     st.markdown("""
     <div style="background: linear-gradient(to right, #3a7bd5, #00d2ff); 
                 padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
-        <h2 style="color: white; margin-bottom: 10px;">Transform Your Learning Journey Into An Adventure</h2>
+        <h2 style="color: white; margin-bottom: 10px;">Transform Your Emotional Well-being Into A Journey of Growth</h2>
         <p style="color: white; font-style: italic;">
-            "The secret of getting ahead is getting started. The secret of getting started is breaking your complex, 
-            overwhelming tasks into small manageable tasks, and then starting on the first one."
-            <br>— Mark Twain
+            "The greatest glory in living lies not in never falling, but in rising every time we fall. 
+            The journey of self-discovery and emotional growth is not about being perfect, 
+            but about being present and learning from each moment."
+            <br>— Nelson Mandela
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -621,12 +628,20 @@ elif page == "📝 Log Activity":
             habit_name = selected_habit_with_points.split(" (")[0]
             habit_points = int(selected_habit_with_points.split("(")[1].split(" ")[0])
             
+            # Add emotional state tracking
+            emotional_states = ["Anxious", "Motivated", "Tired", "Sad", "Peaceful", "Euphoric"]
+            emotional_state_before = st.selectbox("How were you feeling before doing this?", emotional_states)
+            emotional_state_after = st.selectbox("How are you feeling now?", emotional_states)
+            energy_level = st.slider("Energy level (1-5)", 1, 5, 3)
+            
             comment = st.text_area("Comment (optional)", key="quick_comment")
             quick_submit = st.form_submit_button("Log Activity")
         
         if quick_submit:
-            new_row = pd.DataFrame([[date.strftime("%Y-%m-%d"), selected_category, habit_name, habit_points, comment]],
-                                   columns=["Date", "Category", "Task", "Points", "Comment"])
+            new_row = pd.DataFrame([[date.strftime("%Y-%m-%d"), selected_category, habit_name, habit_points, comment, 
+                                   emotional_state_before, emotional_state_after, energy_level]],
+                                   columns=["Date", "Category", "Task", "Points", "Comment", 
+                                          "Emotional_State_Before", "Emotional_State_After", "Energy_Level"])
             updated_tasks_df = pd.concat([tasks_df, new_row], ignore_index=True)
             updated_tasks_df.to_csv(TASKS_FILE, index=False)
             st.success(f"✅ Activity logged: {habit_name} for {habit_points} points!")
@@ -639,9 +654,16 @@ elif page == "📝 Log Activity":
         
         with st.form(key="custom_log_form"):
             c_date = st.date_input("Date", datetime.date.today(), key="custom_date")
-            c_category = st.selectbox("Category", ["Professional", "Personal"], key="custom_category")
+            c_category = st.selectbox("Category", ["Professional", "Personal", "Self-Care"], key="custom_category")
             c_task = st.text_input("Activity Description", key="custom_task")
             c_points = st.number_input("Points", min_value=1, max_value=100, value=5, step=1, key="custom_points")
+            
+            # Add emotional state tracking
+            emotional_states = ["Anxious", "Motivated", "Tired", "Sad", "Peaceful", "Euphoric"]
+            c_emotional_state_before = st.selectbox("How were you feeling before doing this?", emotional_states, key="custom_emotional_before")
+            c_emotional_state_after = st.selectbox("How are you feeling now?", emotional_states, key="custom_emotional_after")
+            c_energy_level = st.slider("Energy level (1-5)", 1, 5, 3, key="custom_energy")
+            
             c_comment = st.text_area("Comment (optional)", key="custom_comment")
             custom_submit = st.form_submit_button("Log Custom Activity")
         
@@ -649,8 +671,10 @@ elif page == "📝 Log Activity":
             if not c_task:
                 st.error("Please enter an activity description.")
             else:
-                new_row = pd.DataFrame([[c_date.strftime("%Y-%m-%d"), c_category, c_task, c_points, c_comment]],
-                                       columns=["Date", "Category", "Task", "Points", "Comment"])
+                new_row = pd.DataFrame([[c_date.strftime("%Y-%m-%d"), c_category, c_task, c_points, c_comment,
+                                       c_emotional_state_before, c_emotional_state_after, c_energy_level]],
+                                       columns=["Date", "Category", "Task", "Points", "Comment",
+                                              "Emotional_State_Before", "Emotional_State_After", "Energy_Level"])
                 updated_tasks_df = pd.concat([tasks_df, new_row], ignore_index=True)
                 updated_tasks_df.to_csv(TASKS_FILE, index=False)
                 st.success(f"✅ Custom activity logged: {c_task} for {c_points} points!")
@@ -1063,6 +1087,269 @@ elif page == "🎁 Rewards":
         else:
             st.info("No rewards have been redeemed yet.")
 
+# Add Emotional Well-being section
+elif page == "😌 Emotional Well-being":
+    st.title("😌 Emotional Well-being")
+    st.markdown("""
+    Monitor and improve your emotional well-being over time.
+    
+    🌟 **Features:**
+    - Daily emotion tracking
+    - Emotional pattern analysis
+    - Personalized recommendations
+    - Mindfulness exercises
+    """)
+    
+    tasks_df, todo_df, habits_data, rewards_data = load_data()
+    
+    # Create tabs for different emotional well-being features
+    well_tab1, well_tab2, well_tab3 = st.tabs(["Daily Check-in", "Emotional Patterns", "Exercises"])
+    
+    with well_tab1:
+        st.subheader("Daily Emotion Check-in")
+        
+        with st.form(key="daily_emotion_form"):
+            today = datetime.date.today()
+            st.write(f"### {today.strftime('%B %d, %Y')}")
+            
+            # Morning check-in
+            st.markdown("#### 🌅 Morning Check-in")
+            morning_emotion = st.selectbox(
+                "How are you feeling this morning?",
+                ["Anxious", "Motivated", "Tired", "Sad", "Peaceful", "Euphoric"],
+                key="morning_emotion"
+            )
+            morning_energy = st.slider("Energy level (1-5)", 1, 5, 3, key="morning_energy")
+            morning_notes = st.text_area("Notes or thoughts", key="morning_notes")
+            
+            # Evening check-in
+            st.markdown("#### 🌙 Evening Check-in")
+            evening_emotion = st.selectbox(
+                "How are you feeling this evening?",
+                ["Anxious", "Motivated", "Tired", "Sad", "Peaceful", "Euphoric"],
+                key="evening_emotion"
+            )
+            evening_energy = st.slider("Energy level (1-5)", 1, 5, 3, key="evening_energy")
+            evening_notes = st.text_area("Day's reflections", key="evening_notes")
+            
+            # Gratitude practice
+            st.markdown("#### 🙏 Gratitude Practice")
+            gratitude = st.text_area("Three things you're grateful for today", key="gratitude")
+            
+            submit_emotion = st.form_submit_button("Save Daily Check-in")
+        
+        if submit_emotion:
+            # Create a new entry for the daily emotional log
+            new_entry = {
+                "date": today.strftime("%Y-%m-%d"),
+                "morning_emotion": morning_emotion,
+                "morning_energy": morning_energy,
+                "morning_notes": morning_notes,
+                "evening_emotion": evening_emotion,
+                "evening_energy": evening_energy,
+                "evening_notes": evening_notes,
+                "gratitude": gratitude
+            }
+            
+            # Save to a new JSON file for emotional logs
+            EMOTIONAL_LOG_FILE = "emotional_log.json"
+            try:
+                with open(EMOTIONAL_LOG_FILE, "r") as f:
+                    emotional_logs = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                emotional_logs = {"logs": []}
+            
+            emotional_logs["logs"].append(new_entry)
+            
+            with open(EMOTIONAL_LOG_FILE, "w") as f:
+                json.dump(emotional_logs, f, indent=4)
+            
+            st.success("✅ Daily check-in saved successfully!")
+    
+    with well_tab2:
+        st.subheader("Emotional Patterns")
+        
+        # Load emotional logs
+        try:
+            with open("emotional_log.json", "r") as f:
+                emotional_logs = json.load(f)
+            
+            if emotional_logs["logs"]:
+                # Convert to DataFrame for analysis
+                logs_df = pd.DataFrame(emotional_logs["logs"])
+                logs_df['date'] = pd.to_datetime(logs_df['date'])
+                
+                # Emotional state trends
+                st.markdown("### Emotional State Trends")
+                
+                # Morning vs Evening emotions
+                fig_emotions = go.Figure()
+                fig_emotions.add_trace(go.Scatter(
+                    x=logs_df['date'],
+                    y=logs_df['morning_emotion'],
+                    name='Morning',
+                    mode='lines+markers'
+                ))
+                fig_emotions.add_trace(go.Scatter(
+                    x=logs_df['date'],
+                    y=logs_df['evening_emotion'],
+                    name='Evening',
+                    mode='lines+markers'
+                ))
+                fig_emotions.update_layout(
+                    title='Emotional State Evolution',
+                    xaxis_title='Date',
+                    yaxis_title='Emotional State'
+                )
+                st.plotly_chart(fig_emotions, use_container_width=True)
+                
+                # Energy levels
+                fig_energy = go.Figure()
+                fig_energy.add_trace(go.Scatter(
+                    x=logs_df['date'],
+                    y=logs_df['morning_energy'],
+                    name='Morning Energy',
+                    mode='lines+markers'
+                ))
+                fig_energy.add_trace(go.Scatter(
+                    x=logs_df['date'],
+                    y=logs_df['evening_energy'],
+                    name='Evening Energy',
+                    mode='lines+markers'
+                ))
+                fig_energy.update_layout(
+                    title='Energy Levels',
+                    xaxis_title='Date',
+                    yaxis_title='Energy Level (1-5)'
+                )
+                st.plotly_chart(fig_energy, use_container_width=True)
+                
+                # Most common emotions
+                st.markdown("### Most Common Emotional States")
+                morning_emotions = logs_df['morning_emotion'].value_counts()
+                evening_emotions = logs_df['evening_emotion'].value_counts()
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("#### Morning")
+                    fig_morning = px.pie(
+                        values=morning_emotions.values,
+                        names=morning_emotions.index,
+                        title='Emotional State Distribution (Morning)'
+                    )
+                    st.plotly_chart(fig_morning, use_container_width=True)
+                
+                with col2:
+                    st.markdown("#### Evening")
+                    fig_evening = px.pie(
+                        values=evening_emotions.values,
+                        names=evening_emotions.index,
+                        title='Emotional State Distribution (Evening)'
+                    )
+                    st.plotly_chart(fig_evening, use_container_width=True)
+                
+                # Insights and recommendations
+                st.markdown("### Insights and Recommendations")
+                
+                # Calculate emotional improvement
+                emotional_improvement = (logs_df['evening_energy'] - logs_df['morning_energy']).mean()
+                
+                if emotional_improvement > 0:
+                    st.success(f"""
+                    🌟 **Good news!** 
+                    On average, your energy level improves during the day ({emotional_improvement:.1f} points).
+                    """)
+                elif emotional_improvement < 0:
+                    st.warning(f"""
+                    ⚠️ **Attention**: 
+                    Your energy level tends to decrease during the day ({abs(emotional_improvement):.1f} points).
+                    Consider incorporating more breaks and self-care activities.
+                    """)
+                
+                # Most common gratitude themes
+                if 'gratitude' in logs_df.columns:
+                    st.markdown("### Most Common Gratitude Themes")
+                    gratitude_text = ' '.join(logs_df['gratitude'].dropna())
+                    # Here you could add sentiment analysis or keyword extraction
+                    st.write("Your gratitude entries show a positive focus in your life.")
+            
+            else:
+                st.info("No emotional logs yet. Start tracking your emotions in the Daily Check-in!")
+        
+        except FileNotFoundError:
+            st.info("No emotional logs yet. Start tracking your emotions in the Daily Check-in!")
+    
+    with well_tab3:
+        st.subheader("Well-being Exercises")
+        
+        # Create tabs for different types of exercises
+        ex_tab1, ex_tab2, ex_tab3 = st.tabs(["Mindfulness", "Breathing", "Gratitude"])
+        
+        with ex_tab1:
+            st.markdown("""
+            ### 🧘‍♂️ Mindfulness Exercise
+            
+            **5-minute exercise:**
+            1. Find a comfortable position
+            2. Gently close your eyes
+            3. Focus on your breath
+            4. Observe your thoughts without judgment
+            5. Return to your breath when distracted
+            
+            *Suggested duration: 5 minutes*
+            """)
+            
+            if st.button("Start Timer", key="mindfulness_timer"):
+                st.markdown("""
+                <div style="text-align: center; font-size: 48px; margin: 20px;">
+                    5:00
+                </div>
+                """, unsafe_allow_html=True)
+                # Here you could add a real timer implementation
+        
+        with ex_tab2:
+            st.markdown("""
+            ### 🌬️ 4-7-8 Breathing Exercise
+            
+            **Instructions:**
+            1. Inhale through your nose for 4 counts
+            2. Hold your breath for 7 counts
+            3. Exhale through your mouth for 8 counts
+            
+            *Repeat 4 times*
+            """)
+            
+            if st.button("Start Exercise", key="breathing_exercise"):
+                st.markdown("""
+                <div style="text-align: center; font-size: 24px; margin: 20px;">
+                    Inhale... 4
+                    <br>
+                    Hold... 7
+                    <br>
+                    Exhale... 8
+                </div>
+                """, unsafe_allow_html=True)
+                # Here you could add a real breathing exercise implementation
+        
+        with ex_tab3:
+            st.markdown("""
+            ### 🙏 Gratitude Exercise
+            
+            **Instructions:**
+            1. Think of three things you're grateful for today
+            2. Write why each one is meaningful
+            3. Reflect on how they make you feel
+            
+            *Take your time to reflect deeply*
+            """)
+            
+            gratitude_exercise = st.text_area("Write your reflections here", key="gratitude_exercise")
+            if st.button("Save Reflections", key="save_gratitude"):
+                if gratitude_exercise:
+                    st.success("✅ Reflections saved. Thank you for practicing gratitude!")
+                else:
+                    st.warning("Please write your reflections before saving.")
+
 # Add explanatory text for Analytics
 elif page == "📊 Analytics":
     st.title("📊 Performance Analytics")
@@ -1148,14 +1435,71 @@ elif page == "📊 Analytics":
                            title='Distribution of Points by Category')
             st.plotly_chart(fig_pie, use_container_width=True)
             
-            # Task frequency analysis
-            st.subheader("Most Common Tasks")
-            task_freq = tasks_df['Task'].value_counts().head(10)
-            fig_tasks = px.bar(task_freq,
-                             title='Top 10 Most Frequent Tasks',
-                             labels={'value': 'Count', 'index': 'Task'})
-            st.plotly_chart(fig_tasks, use_container_width=True)
+            # Emotional State Analysis
+            st.subheader("Análisis de Estados Emocionales")
             
+            # Emotional state transitions
+            if 'Emotional_State_Before' in tasks_df.columns and 'Emotional_State_After' in tasks_df.columns:
+                # Create transition matrix
+                transitions = pd.crosstab(tasks_df['Emotional_State_Before'], 
+                                        tasks_df['Emotional_State_After'])
+                
+                # Plot heatmap
+                fig_transitions = px.imshow(transitions,
+                                          title='Transiciones de Estados Emocionales',
+                                          labels=dict(x="Estado Después", y="Estado Antes", color="Frecuencia"))
+                st.plotly_chart(fig_transitions, use_container_width=True)
+                
+                # Most effective activities for emotional improvement
+                tasks_df['Emotional_Improvement'] = tasks_df.apply(
+                    lambda x: 1 if x['Emotional_State_After'] in ['En paz', 'Eufórico'] 
+                    and x['Emotional_State_Before'] in ['Anxious', 'Sad', 'Tired'] else 0, axis=1)
+                
+                effective_activities = tasks_df[tasks_df['Emotional_Improvement'] == 1].groupby('Task').size()
+                if not effective_activities.empty:
+                    st.subheader("Actividades más efectivas para mejorar el estado emocional")
+                    fig_effective = px.bar(effective_activities,
+                                         title='Actividades que más mejoran tu estado emocional',
+                                         labels={'value': 'Frecuencia', 'index': 'Actividad'})
+                    st.plotly_chart(fig_effective, use_container_width=True)
+                
+                # Energy level analysis
+                if 'Energy_Level' in tasks_df.columns:
+                    st.subheader("Análisis de Niveles de Energía")
+                    
+                    # Daily energy levels
+                    daily_energy = tasks_df.groupby('Date')['Energy_Level'].mean().reset_index()
+                    fig_energy = px.line(daily_energy,
+                                       x='Date',
+                                       y='Energy_Level',
+                                       title='Daily Energy Level',
+                                       labels={'Energy_Level': 'Energy Level (1-5)'})
+                    st.plotly_chart(fig_energy, use_container_width=True)
+                    
+                    # Energy level by category
+                    category_energy = tasks_df.groupby('Category')['Energy_Level'].mean().reset_index()
+                    fig_category_energy = px.bar(category_energy,
+                                               x='Category',
+                                               y='Energy_Level',
+                                               title='Energy Level by Category',
+                                               labels={'Energy_Level': 'Average Energy Level'})
+                    st.plotly_chart(fig_category_energy, use_container_width=True)
+                    
+                    # Recommendations based on energy levels
+                    if len(tasks_df) >= 3:
+                        recent_energy = tasks_df.sort_values('Date', ascending=False).head(3)['Energy_Level'].mean()
+                        if recent_energy <= 2:
+                            st.warning("""
+                            🚨 **Recommendation**: 
+                            Your energy level has been low in recent days. 
+                            Consider taking a break and focusing on self-care activities.
+                            """)
+                        elif recent_energy >= 4:
+                            st.success("""
+                            🌟 **Excellent!** 
+                            Your energy level is high. 
+                            It's a good time to engage in activities that require more effort.
+                            """)
     else:
         st.info("Start logging activities to see your analytics!")
 
